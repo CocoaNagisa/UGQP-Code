@@ -31,5 +31,3 @@ python reproduce_tables.py --data ../data
 The scripts in `experiments/` reproduce the utility, sensitivity, workflow-scale, graph-density, scheduler-overhead, architecture-scale, domain-workflow, and prototype measurements. Prototype serving scripts require a local Qwen3 model and the additional packages listed in `requirements-prototype.txt`.
 
 The DTODRL pretraining checkpoint is stored in `models/dtodrl_gat_pretrained.pt`. Model and data paths are resolved from the command-line arguments or the repository-relative defaults.
-
-`SHA256SUMS.txt` records the SHA-256 digest of every released file except the checksum file itself.
