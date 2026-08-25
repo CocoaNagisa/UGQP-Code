@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from sb3_contrib import MaskablePPO
@@ -26,7 +27,6 @@ def make_env(
     task_graph_mode: str = "standard",
     quality_propagation_strength: float = 1.50,
 ):
-                                                
     def _factory():
         cfg = make_config(
             seed=seed,
@@ -51,8 +51,8 @@ def _policy_kwargs(
     env: DummyVecEnv,
     encoder: str,
     dtodrl_checkpoint: Path | None = None,
+    dtodrl_freeze_gat: bool = True,
 ) -> dict | None:
-                                                                   
     if encoder == "mlp":
         return None
 
@@ -71,8 +71,8 @@ def _policy_kwargs(
                 "global_feature_dim": 6,
                 "hidden_dim": 32,
                 "features_dim": 128,
-                "checkpoint_path": str(dtodrl_checkpoint.resolve()),
-                "freeze_gat": True,
+                "checkpoint_path": "models/dtodrl_gat_pretrained.pt",
+                "freeze_gat": dtodrl_freeze_gat,
             },
             "net_arch": {"pi": [128, 64], "vf": [128, 64]},
         }
@@ -110,10 +110,9 @@ def train(
     task_graph_mode: str = "standard",
     quality_propagation_strength: float = 1.50,
     dtodrl_checkpoint: Path | None = None,
+    dtodrl_freeze_gat: bool = True,
 ) -> Path:
-               
     ensure_dir(output)
-                                
     if n_envs < 1:
         raise ValueError("n_envs must be at least 1")
     env = DummyVecEnv([
@@ -133,9 +132,14 @@ def train(
         )
         for env_idx in range(n_envs)
     ])
-    policy_kwargs = _policy_kwargs(env, encoder, dtodrl_checkpoint)
+    policy_kwargs = _policy_kwargs(
+        env,
+        encoder,
+        dtodrl_checkpoint,
+        dtodrl_freeze_gat,
+    )
 
-                                                         
+    tensorboard_log = str(output / "tb") if os.getenv("UGQP_ENABLE_TENSORBOARD") else None
     model = MaskablePPO(
         "MlpPolicy",
         env,
@@ -147,13 +151,22 @@ def train(
         learning_rate=3e-4,
         ent_coef=ent_coef,
         clip_range=0.2,
-        tensorboard_log=str(output / "tb"),
+        tensorboard_log=tensorboard_log,
         policy_kwargs=policy_kwargs,
     )
     model.learn(total_timesteps=timesteps, progress_bar=False)
 
     model_path = output / f"ppo_{variant}.zip"
     model.save(model_path)
+    code_root = Path(__file__).resolve().parents[1]
+    def portable(path: Path | None) -> str | None:
+        if path is None:
+            return None
+        try:
+            return path.resolve().relative_to(code_root.resolve()).as_posix()
+        except ValueError:
+            return path.name
+
     write_json(output / "train_config.json", {
         "timesteps": timesteps,
         "seed": seed,
@@ -171,9 +184,10 @@ def train(
         "max_nodes": max_nodes,
         "task_graph_mode": task_graph_mode,
         "quality_propagation_strength": quality_propagation_strength,
-        "dtodrl_checkpoint": str(dtodrl_checkpoint) if dtodrl_checkpoint else None,
+        "dtodrl_checkpoint": portable(dtodrl_checkpoint),
+        "dtodrl_freeze_gat": dtodrl_freeze_gat if encoder == "dtodrl" else None,
         "environment_seeds": [seed + 1009 * idx for idx in range(n_envs)],
-        "model_path": str(model_path),
+        "model_path": portable(model_path),
     })
     return model_path
 
@@ -183,7 +197,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("outputs/train/full"))
     parser.add_argument("--timesteps", type=int, default=5000)
     parser.add_argument("--seed", type=int, default=2026)
-    parser.add_argument("--variant", choices=["full", "no_uncertainty", "no_graph", "no_queue", "no_message_passing"], default="full")
+    parser.add_argument("--variant", choices=["full", "no_uncertainty", "no_uncertainty_risk_mask", "no_graph", "no_queue", "no_message_passing"], default="full")
     parser.add_argument("--arrival-rate", type=float, default=0.7)
     parser.add_argument("--network-scale", type=float, default=1.0)
     parser.add_argument("--deadline-scale", type=float, default=1.0)
@@ -194,6 +208,12 @@ def main() -> None:
     parser.add_argument("--n-envs", type=int, default=4)
     parser.add_argument("--encoder", choices=["gnn", "mlp", "dtodrl"], default="gnn")
     parser.add_argument("--dtodrl-checkpoint", type=Path)
+    parser.add_argument(
+        "--dtodrl-freeze-gat",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Freeze the pretrained DTODRL GAT; use --no-dtodrl-freeze-gat for joint PPO fine-tuning.",
+    )
     parser.add_argument("--min-nodes", type=int, default=5)
     parser.add_argument("--max-nodes", type=int, default=12)
     parser.add_argument("--task-graph-mode", choices=["standard", "dependency_stress"], default="standard")
@@ -219,6 +239,7 @@ def main() -> None:
         args.task_graph_mode,
         args.quality_propagation_strength,
         args.dtodrl_checkpoint,
+        args.dtodrl_freeze_gat,
     )
     print(f"saved model: {path}")
 

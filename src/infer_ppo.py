@@ -8,7 +8,7 @@ from sb3_contrib import MaskablePPO
 from common_io import summarize_episode_rows, write_csv, write_json
 from llm_offload_env.config import make_config
 from llm_offload_env.env import LLMAgentOffloadEnv
-from llm_offload_env.gnn_policy import (              
+from llm_offload_env.gnn_policy import (
     DAGMessagePassingExtractor,
     DTODRLGATExtractor,
 )
@@ -33,14 +33,11 @@ def evaluate_model(
     task_graph_mode: str = "standard",
     quality_propagation_strength: float = 1.50,
 ):
-                                      
     output.mkdir(parents=True, exist_ok=True)
-                             
     model = MaskablePPO.load(model_path)
     episode_rows = []
     action_rows = []
     for ep in range(episodes):
-                                               
         env = LLMAgentOffloadEnv(make_config(
             seed=seed + ep,
             variant=variant,
@@ -59,23 +56,22 @@ def evaluate_model(
         obs, _ = env.reset()
         done = False
         while not done:
-                                                   
             masks = env.action_masks()
-                                                     
             action, _ = model.predict(obs, deterministic=True, action_masks=masks)
             obs, reward, terminated, truncated, _ = env.step(int(action))
             done = terminated or truncated
-                         
         episode_rows.append(env.episode_summary(policy_name, ep))
-                             
         action_rows.extend(env.action_records(policy_name, ep))
-                                             
     write_csv(output / "episode_records.csv", episode_rows)
     write_csv(output / "action_records.csv", action_rows)
     write_csv(output / "summary.csv", summarize_episode_rows(episode_rows))
-             
+    code_root = Path(__file__).resolve().parents[1]
+    try:
+        portable_model = model_path.resolve().relative_to(code_root.resolve()).as_posix()
+    except ValueError:
+        portable_model = model_path.name
     write_json(output / "infer_config.json", {
-        "model_path": str(model_path),
+        "model_path": portable_model,
         "episodes": episodes,
         "seed": seed,
         "variant": variant,
@@ -95,13 +91,12 @@ def evaluate_model(
 
 
 def main() -> None:
-                          
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=Path("outputs/infer"))
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--seed", type=int, default=2026)
-    parser.add_argument("--variant", choices=["full", "no_uncertainty", "no_graph", "no_queue", "no_message_passing"], default="full")
+    parser.add_argument("--variant", choices=["full", "no_uncertainty", "no_uncertainty_risk_mask", "no_graph", "no_queue", "no_message_passing"], default="full")
     parser.add_argument("--policy-name", default="ppo_full")
     parser.add_argument("--arrival-rate", type=float, default=0.7)
     parser.add_argument("--network-scale", type=float, default=1.0)
@@ -115,7 +110,6 @@ def main() -> None:
     parser.add_argument("--task-graph-mode", choices=["standard", "dependency_stress"], default="standard")
     parser.add_argument("--quality-propagation-strength", type=float, default=1.50)
     args = parser.parse_args()
-             
     evaluate_model(
         args.model,
         args.output,

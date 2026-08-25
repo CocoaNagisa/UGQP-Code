@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import torch
+from pathlib import Path
 from gymnasium import spaces
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 import torch.nn.functional as F
 
 
-class DAGMessagePassingExtractor(BaseFeaturesExtractor):
-    """面向 DAG-structured LLM-Agent 任务的真实 message passing 特征提取器。
+class ConstantSchedule:
+    def __init__(self, value: float) -> None:
+        self.value = float(value)
 
-    这个模块从 observation 中读取 DAG 邻接矩阵，让每个子任务节点沿着
-    “前驱->后继”和“后继->前驱”两个方向聚合邻居信息。它是可训练的 GNN
-    编码器；为了 Windows 本地稳定性，用纯 PyTorch 实现，不强制安装 PyG/DGL。
-    """
+    def __call__(self, _: float) -> float:
+        return self.value
+
+
+class DAGMessagePassingExtractor(BaseFeaturesExtractor):
+    """Encode bidirectional messages on a padded workflow DAG."""
 
     def __init__(
         self,
@@ -33,9 +37,7 @@ class DAGMessagePassingExtractor(BaseFeaturesExtractor):
         self.adj_flat_dim = max_nodes * max_nodes
         self.tail_dim = action_count + global_feature_dim
 
-                                   
         self.node_encoder = nn.Linear(node_feature_dim, hidden_dim)
-                                      
         self.self_layers = nn.ModuleList(nn.Linear(hidden_dim, hidden_dim) for _ in range(message_steps))
         self.pred_layers = nn.ModuleList(nn.Linear(hidden_dim, hidden_dim) for _ in range(message_steps))
         self.succ_layers = nn.ModuleList(nn.Linear(hidden_dim, hidden_dim) for _ in range(message_steps))
@@ -58,13 +60,11 @@ class DAGMessagePassingExtractor(BaseFeaturesExtractor):
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         nodes, adjacency, tail = self._split_observation(observations)
-                                     
         node_mask = (nodes.abs().sum(dim=-1, keepdim=True) > 0).float()
         adjacency = adjacency * node_mask * node_mask.transpose(1, 2)
 
         h = F.relu(self.node_encoder(nodes)) * node_mask
         for step in range(len(self.self_layers)):
-                                      
             pred_msg = torch.bmm(adjacency.transpose(1, 2), h)
             succ_msg = torch.bmm(adjacency, h)
 
@@ -80,10 +80,8 @@ class DAGMessagePassingExtractor(BaseFeaturesExtractor):
             )
             h = F.relu(self.norm_layers[step](h_new)) * node_mask
 
-                                                       
         current_weight = nodes[:, :, 0:1] * node_mask
         current_emb = (h * current_weight).sum(dim=1) / current_weight.sum(dim=1).clamp_min(1.0)
-                                     
         mean_emb = (h * node_mask).sum(dim=1) / node_mask.sum(dim=1).clamp_min(1.0)
         masked_h = h.masked_fill(node_mask == 0, -1e9)
         max_emb = masked_h.max(dim=1).values
@@ -227,16 +225,16 @@ class DTODRLGATExtractor(BaseFeaturesExtractor):
 
         self.gat_encoder = DTODRLGATEncoder(input_dim=6, hidden_dim=hidden_dim, heads=4)
         if checkpoint_path:
-            checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+            checkpoint = Path(checkpoint_path)
+            if not checkpoint.is_absolute():
+                checkpoint = Path(__file__).resolve().parents[2] / checkpoint
+            checkpoint = torch.load(checkpoint, map_location="cpu", weights_only=True)
             state_dict = checkpoint.get("encoder_state_dict", checkpoint)
             self.gat_encoder.load_state_dict(state_dict)
         if freeze_gat:
             for parameter in self.gat_encoder.parameters():
                 parameter.requires_grad = False
 
-                                                                             
-                                                                               
-                                                          
         self.register_buffer(
             "location_capability",
             torch.tensor([0.46, 0.70, 0.84, 0.94, 1.00], dtype=torch.float32),

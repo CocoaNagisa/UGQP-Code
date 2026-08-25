@@ -207,7 +207,7 @@ def pretrain(
                 "feature_loss_weight": 1.0,
                 "structure_loss_weight": 0.15,
                 "feature_corruption_probability": 0.15,
-                "checkpoint": str(checkpoint),
+                "checkpoint": checkpoint.name,
             },
             indent=2,
         ),

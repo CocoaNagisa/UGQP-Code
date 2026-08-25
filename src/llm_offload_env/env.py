@@ -23,34 +23,22 @@ from .taskgen import Task, generate_task
 
 
 class LLMAgentOffloadEnv(gym.Env):
-    """智慧城市 LLM-Agent DAG 子任务卸载环境。
-
-    一个 episode 表示一个完整 LLM-Agent 工作流；一个 step 表示为当前 DAG 节点选择
-    local / edge_s / edge_m / edge_l / cloud 中的一个执行位置。环境会输出节点特征、
-    DAG 邻接矩阵、服务器队列状态和全局状态，供 MaskablePPO 或 GNN-PPO 学习调度策略。
-    """
+    """Gymnasium environment for node-level workflow placement."""
 
     metadata = {"render_modes": []}
 
     def __init__(self, config: EnvConfig | None = None):
         super().__init__()
-                                                              
         self.config = config or EnvConfig()
-                                              
         self.rng = random.Random(self.config.seed)
         self.queue_rng = random.Random(self.config.seed + 1_000_003)
         self.observation_rng = random.Random(self.config.seed + 2_000_003)
-                                 
         self.action_space = spaces.Discrete(len(ACTIONS))
-                                                                         
         self.node_feature_dim = 12
-                                                           
         self.adjacency_dim = self.config.max_nodes * self.config.max_nodes
-                                                  
         obs_dim = self.config.max_nodes * self.node_feature_dim + self.adjacency_dim + len(ACTIONS) + 6
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=np.float32)
 
-                                          
         self.task: Task | None = None
         self.profiles = default_profiles(self.config.profile_mode)
         self.ready_order: list[int] = []
@@ -64,12 +52,10 @@ class LLMAgentOffloadEnv(gym.Env):
         self.node_permutation = list(range(self.config.max_nodes))
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
-                                              
         if seed is not None:
             self.rng.seed(seed)
             self.queue_rng.seed(seed + 1_000_003)
             self.observation_rng.seed(seed + 2_000_003)
-                                               
         self.profiles = default_profiles(self.config.profile_mode)
         self.queue_burst_remaining = initialize_background_queues(
             self.profiles,
@@ -78,7 +64,6 @@ class LLMAgentOffloadEnv(gym.Env):
             self.config.queue_mode,
             self.config.queue_scale,
         )
-                                       
         self.task = generate_task(
             self.rng,
             task_id=self.episode_id,
@@ -87,7 +72,6 @@ class LLMAgentOffloadEnv(gym.Env):
             deadline_scale=self.config.deadline_scale,
             graph_mode=self.config.task_graph_mode,
         )
-                                             
         self.ready_order = list(range(len(self.task.nodes)))
         self.node_permutation = list(range(self.config.max_nodes))
         if self.config.permute_node_order:
@@ -101,12 +85,10 @@ class LLMAgentOffloadEnv(gym.Env):
         return self._obs(), {}
 
     def step(self, action: int):
-                           
         assert self.task is not None
         node = self.task.nodes[self.ready_order[self.current_pos]]
         mask = self.action_masks()
 
-                                                    
         invalid = mask[action] == 0
         if invalid:
             feasible_ids = [idx for idx, ok in enumerate(mask) if ok]
@@ -116,7 +98,6 @@ class LLMAgentOffloadEnv(gym.Env):
         profile = self.profiles[action_name]
         queue_snapshot = {name: p.queue_load for name, p in self.profiles.items()}
 
-                                                        
         step_latency = latency(node, profile, self.rng, self.config.network_scale)
         base_step_quality = quality(node, profile)
         predecessor_quality = float(np.mean([
@@ -134,13 +115,11 @@ class LLMAgentOffloadEnv(gym.Env):
         step_quality = min(1.0, max(0.0, base_step_quality - propagation_penalty))
         step_cost = cost(node, profile)
 
-                                        
         start_time = max([self.completion[p] for p in node.predecessors], default=0.0)
         finish_time = start_time + step_latency
         self.completion[node.idx] = finish_time
         self.realized_quality[node.idx] = step_quality
 
-                                                      
         update_queue(profile, node, step_latency, self.config.arrival_rate)
         advance_background_queues(
             self.profiles,
@@ -155,7 +134,6 @@ class LLMAgentOffloadEnv(gym.Env):
             self.queue_burst_remaining,
         )
 
-                                          
         high_risk_local = 1 if action_name == "local" and node.uncertainty > 0.60 else 0
         load_var = self._load_variance()
         latency_norm = max(self.config.reward_latency_normalizer, 1e-6)
@@ -169,7 +147,6 @@ class LLMAgentOffloadEnv(gym.Env):
         if invalid:
             reward -= self.config.invalid_action_penalty
 
-                                       
         self.node_results.append({
             "step": self.current_pos,
             "node_id": node.idx,
@@ -203,7 +180,6 @@ class LLMAgentOffloadEnv(gym.Env):
         self.current_pos += 1
         terminated = self.current_pos >= len(self.task.nodes)
         if terminated:
-                                                  
             makespan = max(self.completion.values()) if self.completion else 0.0
             if makespan > self.task.deadline:
                 reward -= self.config.reward_deadline_weight * (
@@ -213,27 +189,21 @@ class LLMAgentOffloadEnv(gym.Env):
         return self._obs(), float(reward), terminated, False, {}
 
     def action_masks(self) -> np.ndarray:
-                                                
         assert self.task is not None
         if self.current_pos >= len(self.task.nodes):
             return np.ones(len(ACTIONS), dtype=bool)
 
         node = self.task.nodes[self.ready_order[self.current_pos]]
-        if self.config.variant == "no_uncertainty":
-                                                                         
-                                                            
+        if self.config.variant in {"no_uncertainty", "no_uncertainty_risk_mask"}:
             node = replace(node, uncertainty=0.0, risk=0.0)
         mask = np.zeros(len(ACTIONS), dtype=bool)
         for idx, action in ID_TO_ACTION.items():
-                                                   
             mask[idx] = feasible(node, self.profiles[action])
         if not mask.any():
-                                       
             mask[-1] = True
         return mask
 
     def episode_summary(self, policy: str, episode: int) -> dict[str, Any]:
-                                  
         assert self.task is not None
         total_latency = max(self.completion.values()) if self.completion else 0.0
         avg_quality = float(np.mean([r["quality"] for r in self.node_results])) if self.node_results else 0.0
@@ -275,7 +245,6 @@ class LLMAgentOffloadEnv(gym.Env):
         return [{"policy": policy, "episode": episode, **row} for row in self.node_results]
 
     def _obs(self) -> np.ndarray:
-                             
         assert self.task is not None
         node_rows: list[list[float]] = []
         current_node_id = self.ready_order[self.current_pos] if self.current_pos < len(self.ready_order) else -1
@@ -285,10 +254,11 @@ class LLMAgentOffloadEnv(gym.Env):
                 node = self.task.nodes[idx]
                 is_current = 1.0 if idx == current_node_id else 0.0
                 executed = 1.0 if idx in self.completion else 0.0
-                uncertainty = 0.0 if self.config.variant == "no_uncertainty" else node.uncertainty
-                risk = 0.0 if self.config.variant == "no_uncertainty" else node.risk
+                risk_blind = self.config.variant in {"no_uncertainty", "no_uncertainty_risk_mask"}
+                uncertainty = 0.0 if risk_blind else node.uncertainty
+                risk = 0.0 if risk_blind else node.risk
                 criticality = 0.0 if self.config.variant == "no_graph" else node.criticality
-                downstream = 0.0 if self.config.variant in {"no_graph", "no_uncertainty"} else node.downstream_risk
+                downstream = 0.0 if self.config.variant in {"no_graph", "no_uncertainty", "no_uncertainty_risk_mask"} else node.downstream_risk
                 pred_count = 0.0 if self.config.variant == "no_graph" else min(len(node.predecessors) / 4.0, 1.0)
                 realized_quality = self.realized_quality.get(idx, 0.0)
                 row = [
@@ -337,7 +307,6 @@ class LLMAgentOffloadEnv(gym.Env):
         return np.asarray(rows + adjacency + queues + globals_, dtype=np.float32)
 
     def _adjacency_features(self) -> list[float]:
-                                     
         assert self.task is not None
         if self.config.variant in {"no_graph", "no_message_passing"}:
             return [0.0] * self.adjacency_dim
@@ -353,7 +322,6 @@ class LLMAgentOffloadEnv(gym.Env):
         return values
 
     def _load_variance(self) -> float:
-                                       
         loads = [p.queue_load for name, p in self.profiles.items() if name.startswith("edge")]
         if not loads:
             return 0.0
