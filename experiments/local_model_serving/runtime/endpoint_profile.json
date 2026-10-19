@@ -1,0 +1,281 @@
+{
+  "profile_id": "v5_bridge_v1",
+  "source": "E1b independent real-output calibration; disjoint from formal replicates 8-10",
+  "difficulty_definition": "node uncertainty bands from the frozen E1b task-shape records: low < 0.40, medium 0.40-<0.70, high >= 0.70; actual typed-field quality, token usage, and latency are joined by node kind and this band",
+  "normalization": "model_work = (parameter_count / 1.7B) * (prompt_tokens + completion_tokens) / 1000",
+  "queue_capable": true,
+  "models": {
+    "1.7B": {
+      "n_calls": 192,
+      "mean_field_accuracy": 0.8713417658730158,
+      "quality_by_kind": {
+        "intent": 1.0,
+        "extract": 1.0,
+        "retrieve": 0.890625,
+        "tool_call": 0.8819444444444444,
+        "plan": 0.8819444444444444,
+        "generate": 0.0,
+        "verify": 0.5625,
+        "summarize": 0.8630952380952381
+      },
+      "quality_by_kind_difficulty": {
+        "intent": {
+          "low": 1.0,
+          "medium": 1.0
+        },
+        "extract": {
+          "low": 1.0,
+          "medium": 1.0
+        },
+        "retrieve": {
+          "low": 0.9038461538461539,
+          "medium": 0.9077380952380952,
+          "high": 0.7976190476190477
+        },
+        "tool_call": {
+          "low": 0.8888888888888888,
+          "medium": 0.8690476190476191,
+          "high": 0.9166666666666666
+        },
+        "plan": {
+          "medium": 0.8333333333333334,
+          "high": 0.9111111111111111
+        },
+        "generate": {},
+        "verify": {
+          "low": 0.6666666666666666,
+          "medium": 0.59375,
+          "high": 0.4
+        },
+        "summarize": {
+          "low": 0.7142857142857143,
+          "medium": 0.8775510204081632,
+          "high": 0.9285714285714286
+        }
+      },
+      "median_latency_s": 0.3405663760004245,
+      "median_latency_by_kind": {
+        "intent": 0.1073079729994788,
+        "extract": 0.39837173199885,
+        "retrieve": 0.2681965384999785,
+        "tool_call": 0.4770937485009199,
+        "plan": 0.4398004869999568,
+        "generate": 0.1,
+        "verify": 0.21503816849872237,
+        "summarize": 0.5336680279997381
+      },
+      "latency_by_kind_difficulty": {
+        "intent": {
+          "low": 0.1057060659986746,
+          "medium": 0.10890988000028301
+        },
+        "extract": {
+          "low": 0.393069549001666,
+          "medium": 0.39837173199885
+        },
+        "retrieve": {
+          "low": 0.26530557699879864,
+          "medium": 0.2681965384999785,
+          "high": 0.28460879100020975
+        },
+        "tool_call": {
+          "low": 0.48933848349952314,
+          "medium": 0.4827083740001399,
+          "high": 0.44825211400166154
+        },
+        "plan": {
+          "medium": 0.43438428599984036,
+          "high": 0.4452166880000732
+        },
+        "generate": {},
+        "verify": {
+          "low": 0.1726330429992231,
+          "medium": 0.21439822749925952,
+          "high": 0.23604252099903533
+        },
+        "summarize": {
+          "low": 0.5204468350002571,
+          "medium": 0.5291549414996553,
+          "high": 0.5825526594999246
+        }
+      },
+      "mean_prompt_tokens": 334.796875,
+      "mean_completion_tokens": 30.640625,
+      "prefill_rate": 2184.5757772476877,
+      "decode_rate": 163.58111428081153,
+      "base_latency": 0.01,
+      "normalized_model_work_ratio": 1.0,
+      "token_cost_by_kind_difficulty": {
+        "intent": {
+          "low": 1.0,
+          "medium": 1.0
+        },
+        "extract": {
+          "low": 1.0,
+          "medium": 1.0
+        },
+        "retrieve": {
+          "low": 1.0,
+          "medium": 1.0,
+          "high": 1.0
+        },
+        "tool_call": {
+          "low": 1.0,
+          "medium": 1.0,
+          "high": 1.0
+        },
+        "plan": {
+          "medium": 1.0,
+          "high": 1.0
+        },
+        "generate": {},
+        "verify": {
+          "low": 1.0,
+          "medium": 1.0,
+          "high": 1.0
+        },
+        "summarize": {
+          "low": 1.0,
+          "medium": 1.0,
+          "high": 1.0
+        }
+      }
+    },
+    "8B": {
+      "n_calls": 192,
+      "mean_field_accuracy": 0.9924355158730159,
+      "quality_by_kind": {
+        "intent": 1.0,
+        "extract": 1.0,
+        "retrieve": 0.9861111111111112,
+        "tool_call": 0.9861111111111112,
+        "plan": 0.9930555555555556,
+        "generate": 0.0,
+        "verify": 1.0,
+        "summarize": 0.9880952380952381
+      },
+      "quality_by_kind_difficulty": {
+        "intent": {
+          "low": 1.0,
+          "medium": 1.0
+        },
+        "extract": {
+          "low": 1.0,
+          "medium": 1.0
+        },
+        "retrieve": {
+          "low": 1.0,
+          "medium": 0.9761904761904762,
+          "high": 1.0
+        },
+        "tool_call": {
+          "low": 1.0,
+          "medium": 0.9761904761904762,
+          "high": 1.0
+        },
+        "plan": {
+          "medium": 0.9814814814814815,
+          "high": 1.0
+        },
+        "generate": {},
+        "verify": {
+          "low": 1.0,
+          "medium": 1.0,
+          "high": 1.0
+        },
+        "summarize": {
+          "low": 1.0,
+          "medium": 0.9795918367346939,
+          "high": 1.0
+        }
+      },
+      "median_latency_s": 0.7239041285010899,
+      "median_latency_by_kind": {
+        "intent": 0.2020389934987179,
+        "extract": 0.813580310999896,
+        "retrieve": 0.6047926510000252,
+        "tool_call": 0.980132908500309,
+        "plan": 1.0016176400004042,
+        "generate": 0.1,
+        "verify": 0.42470157950083376,
+        "summarize": 1.0997169519996532
+      },
+      "latency_by_kind_difficulty": {
+        "intent": {
+          "low": 0.19983013800083427,
+          "medium": 0.2097787349994178
+        },
+        "extract": {
+          "low": 0.813580310999896,
+          "medium": 0.8145144674999756
+        },
+        "retrieve": {
+          "low": 0.5779386809990683,
+          "medium": 0.5864240970004175,
+          "high": 0.6312688100006199
+        },
+        "tool_call": {
+          "low": 0.9839406370010693,
+          "medium": 0.9723390114995709,
+          "high": 0.980132908500309
+        },
+        "plan": {
+          "medium": 1.0105205770014436,
+          "high": 0.9996883890016761
+        },
+        "generate": {},
+        "verify": {
+          "low": 0.42104112400193117,
+          "medium": 0.42529855750035495,
+          "high": 0.424584884000069
+        },
+        "summarize": {
+          "low": 1.0496920484984003,
+          "medium": 1.0997169519996532,
+          "high": 1.095041308501095
+        }
+      },
+      "mean_prompt_tokens": 333.6614583333333,
+      "mean_completion_tokens": 29.213541666666668,
+      "prefill_rate": 1024.2653387578946,
+      "decode_rate": 73.37370821880916,
+      "base_latency": 0.01,
+      "normalized_model_work_ratio": 4.705882352941177,
+      "token_cost_by_kind_difficulty": {
+        "intent": {
+          "low": 4.705882352941177,
+          "medium": 4.705882352941177
+        },
+        "extract": {
+          "low": 4.705882352941177,
+          "medium": 4.705882352941177
+        },
+        "retrieve": {
+          "low": 4.705882352941177,
+          "medium": 4.705882352941177,
+          "high": 4.705882352941177
+        },
+        "tool_call": {
+          "low": 4.705882352941177,
+          "medium": 4.705882352941177,
+          "high": 4.705882352941177
+        },
+        "plan": {
+          "medium": 4.705882352941177,
+          "high": 4.705882352941177
+        },
+        "generate": {},
+        "verify": {
+          "low": 4.705882352941177,
+          "medium": 4.705882352941177,
+          "high": 4.705882352941177
+        },
+        "summarize": {
+          "low": 4.705882352941177,
+          "medium": 4.705882352941177,
+          "high": 4.705882352941177
+        }
+      }
+    }
+  }
+}
